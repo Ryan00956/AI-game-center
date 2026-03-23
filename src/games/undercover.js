@@ -10,11 +10,8 @@
  * Each AI player can be assigned a different API profile (model).
  */
 import { aiService } from '../ai-service.js';
-
-const AVATARS = ['🧑', '👩', '👨', '🧓', '👴', '👱', '🧔', '👲'];
-const AI_NAMES = ['小明', '小红', '小刚', '小丽', '小华', '小芳', '小强'];
-
-const PROFILE_COLORS = ['#4f7cff', '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#f97316'];
+import { registerGame } from '../game-registry.js';
+import { BaseGame, AVATARS, AI_NAMES } from './base-game.js';
 
 // Word pairs: [civilian word, undercover word]
 const WORD_PAIRS = [
@@ -50,14 +47,10 @@ const WORD_PAIRS = [
   ['枕头', '抱枕'],
 ];
 
-export class UndercoverGame {
+export class UndercoverGame extends BaseGame {
   constructor(container, app) {
-    this.container = container;
-    this.app = app;
-    this.state = 'setup';
-    this.players = [];
+    super(container, app);
     this.roundCount = 0;
-    this.messages = [];
     this.civilianWord = '';
     this.undercoverWord = '';
     this.userName = '';
@@ -65,10 +58,6 @@ export class UndercoverGame {
     this.undercoverCount = 1;
     this.hasBlank = false;
     this.isProcessing = false;
-    this.gameResult = null;
-    // Per-player profile assignments
-    this.playerProfiles = {};
-
     this.renderSetup();
   }
 
@@ -76,13 +65,7 @@ export class UndercoverGame {
   renderSetup() {
     const profiles = aiService.profiles;
     const aiCount = this.playerCount - 1;
-    const defaultProfile = aiService.getDefaultProfile();
-
-    for (let i = 0; i < aiCount; i++) {
-      if (!this.playerProfiles[i]) {
-        this.playerProfiles[i] = defaultProfile?.id || '';
-      }
-    }
+    this.initDefaultProfiles(aiCount);
 
     this.container.innerHTML = `
       <div class="game-header">
@@ -121,7 +104,7 @@ export class UndercoverGame {
           <div class="setup-section-title">🤖 AI 玩家模型分配</div>
           <p class="form-hint" style="margin-bottom:12px;">为每个 AI 玩家分配不同的大模型，观看不同模型之间的对决！</p>
           <div class="ai-player-list" id="ai-player-list">
-            ${this.renderAIPlayerAssignments(aiCount, profiles)}
+            ${this.renderAISlots(aiCount, profiles)}
           </div>
           ${profiles.length === 0 ? '<p class="form-hint" style="margin-top:8px;color:var(--accent-orange);">⚠️ 还没有配置模型档案，请先在右上角「模型配置」中添加</p>' : ''}
         </div>
@@ -137,14 +120,9 @@ export class UndercoverGame {
     document.getElementById('select-player-count')?.addEventListener('change', (e) => {
       this.playerCount = parseInt(e.target.value);
       const newAiCount = this.playerCount - 1;
-      const def = aiService.getDefaultProfile();
-      for (let i = 0; i < newAiCount; i++) {
-        if (!this.playerProfiles[i]) {
-          this.playerProfiles[i] = def?.id || '';
-        }
-      }
+      this.initDefaultProfiles(newAiCount);
       document.getElementById('ai-player-list').innerHTML =
-        this.renderAIPlayerAssignments(newAiCount, aiService.profiles);
+        this.renderAISlots(newAiCount, aiService.profiles);
       this.bindProfileSelectors(newAiCount);
     });
 
@@ -164,44 +142,6 @@ export class UndercoverGame {
       this.playerCount = parseInt(document.getElementById('select-player-count').value);
       this.startGame();
     });
-  }
-
-  renderAIPlayerAssignments(aiCount, profiles) {
-    const names = AI_NAMES.slice(0, aiCount);
-    return names.map((name, i) => {
-      const selectedId = this.playerProfiles[i] || '';
-      const profileIdx = profiles.findIndex(p => p.id === selectedId);
-      const color = profileIdx >= 0 ? PROFILE_COLORS[profileIdx % PROFILE_COLORS.length] : '#666';
-      return `
-        <div class="ai-player-row">
-          <div class="player-avatar">${AVATARS[i % AVATARS.length]}</div>
-          <span class="player-name">${name}</span>
-          <div class="model-color-indicator" style="background:${color}" id="dot-${i}"></div>
-          <select class="form-input" id="profile-select-${i}" data-slot="${i}">
-            ${profiles.length === 0 ? '<option value="">无可用模型</option>' : ''}
-            ${profiles.map((p, pi) => `
-              <option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.name} (${p.model})</option>
-            `).join('')}
-          </select>
-        </div>
-      `;
-    }).join('');
-  }
-
-  bindProfileSelectors(aiCount) {
-    for (let i = 0; i < aiCount; i++) {
-      const sel = document.getElementById(`profile-select-${i}`);
-      if (sel) {
-        sel.addEventListener('change', (e) => {
-          this.playerProfiles[i] = e.target.value;
-          const idx = aiService.profiles.findIndex(p => p.id === e.target.value);
-          const dot = document.getElementById(`dot-${i}`);
-          if (dot) {
-            dot.style.background = idx >= 0 ? PROFILE_COLORS[idx % PROFILE_COLORS.length] : '#666';
-          }
-        });
-      }
-    }
   }
 
   // ─── Game Init ───
@@ -302,49 +242,11 @@ export class UndercoverGame {
 
   // ─── Game UI ───
   renderGameUI() {
-    this.container.innerHTML = `
-      <div class="game-header">
-        <div class="game-header-left">
-          <button class="btn-back" id="btn-back">←</button>
-          <div class="game-title-area">
-            <h2>🕵️ 谁是卧底</h2>
-            <span id="game-status-text">游戏进行中...</span>
-          </div>
-        </div>
-        <div>
-          <span class="phase-indicator day" id="phase-badge">🗣 描述阶段</span>
-        </div>
-      </div>
-      <div class="game-area">
-        <div class="players-panel" id="players-panel">
-          <h4>玩家列表</h4>
-          ${this.renderPlayerList()}
-        </div>
-        <div class="game-log" id="game-log">
-          <div class="game-log-header">
-            <span>游戏记录</span>
-            <span id="round-info">准备中...</span>
-          </div>
-          <div class="game-log-messages" id="game-messages"></div>
-          <div id="action-area"></div>
-          <div class="game-input-area" id="input-area" style="display:none">
-            <div class="game-input-row">
-              <input type="text" class="game-input" id="game-input" 
-                placeholder="输入你对词语的描述..." disabled />
-              <button class="btn-send" id="btn-send" disabled>➤</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('btn-back')?.addEventListener('click', () => {
-      if (confirm('确定要退出游戏吗？')) this.app.navigate('home');
-    });
-
-    const msgContainer = document.getElementById('game-messages');
-    this.messages.forEach(msg => {
-      msgContainer.appendChild(this.createMessageElement(msg));
+    this.renderGameLayout({
+      title: '谁是卧底',
+      emoji: '🕵️',
+      phaseLabel: '🗣 描述阶段',
+      phaseClass: 'day',
     });
   }
 
@@ -364,11 +266,6 @@ export class UndercoverGame {
         </div>
       `;
     }).join('');
-  }
-
-  updatePlayerList() {
-    const panel = document.getElementById('players-panel');
-    if (panel) panel.innerHTML = `<h4>玩家列表</h4>${this.renderPlayerList()}`;
   }
 
   showWordReveal() {
@@ -397,10 +294,8 @@ export class UndercoverGame {
   // ─── Round Flow ───
   async startRound() {
     this.roundCount++;
-    const badge = document.getElementById('phase-badge');
-    if (badge) badge.textContent = `🗣 第${this.roundCount}轮描述`;
-    const roundInfo = document.getElementById('round-info');
-    if (roundInfo) roundInfo.textContent = `第 ${this.roundCount} 轮`;
+    this.setPhaseIndicator(`🗣 第${this.roundCount}轮描述`);
+    this.setRoundInfo(`第 ${this.roundCount} 轮`);
 
     this.addSystemMessage(`📢 第 ${this.roundCount} 轮开始！请每位玩家依次描述自己的词语`, 'important');
 
@@ -423,48 +318,25 @@ export class UndercoverGame {
 
   async userDescribe() {
     this.addSystemMessage('轮到你描述了，请输入你对词语的描述');
-
-    const inputArea = document.getElementById('input-area');
-    const input = document.getElementById('game-input');
-    const btn = document.getElementById('btn-send');
-
-    if (inputArea) inputArea.style.display = 'block';
-    if (input) { input.disabled = false; input.placeholder = '描述你的词语（不要直接说出来）...'; input.focus(); }
-    if (btn) btn.disabled = false;
-
-    return new Promise(resolve => {
-      const submit = () => {
-        const text = input.value.trim();
-        if (!text) return;
-        input.value = '';
-        input.disabled = true;
-        btn.disabled = true;
-        this.userPlayer.descriptions.push(text);
-        this.addPlayerMessage(this.userPlayer, text);
-        resolve(text);
-      };
-
-      btn.onclick = submit;
-      input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
-    });
+    const text = await this.waitForUserInput('描述你的词语（不要直接说出来）...');
+    if (this._d()) return;
+    this.userPlayer.descriptions.push(text);
+    this.addPlayerMessage(this.userPlayer, text);
+    return text;
   }
 
   async aiDescribe(player) {
-    this.showThinking(player);
+    const prompt = this.buildDescribePrompt(player);
+    const response = await this.callAI(player, prompt, { temperature: 0.9, maxTokens: 100 });
+    if (this._d()) return;
 
-    try {
-      const prompt = this.buildDescribePrompt(player);
-      const response = await aiService.chat(prompt, { temperature: 0.9, maxTokens: 100 }, player.profileId);
-      this.hideThinking();
+    if (response) {
       player.descriptions.push(response);
       this.addPlayerMessage(player, response);
-    } catch (err) {
-      this.hideThinking();
-      this.addSystemMessage(`⚠️ ${player.name} (${player.modelName}) API调用失败: ${err.message}`, 'danger');
+    } else {
       const desc = this.getFallbackDescription(player);
       player.descriptions.push(desc);
       this.addPlayerMessage(player, desc);
-      console.error(`AI ${player.name} (${player.modelName}) error:`, err);
     }
 
     await this.sleep(600);
@@ -540,14 +412,12 @@ ${prevDescs}
 
   // ─── Voting ───
   async startVote() {
-    const badge = document.getElementById('phase-badge');
-    if (badge) badge.textContent = `🗳 投票淘汰`;
+    this.setPhaseIndicator('🗳 投票淘汰');
 
     this.addSystemMessage('🗳 投票阶段！请选择你认为是卧底的玩家', 'important');
 
     const alive = this.alivePlayers;
     const votes = {};
-    // Record how many messages exist before voting, so AI prompts won't include any vote info
     const preVoteMessageCount = this.messages.length;
 
     if (this.userPlayer.alive) {
@@ -558,25 +428,26 @@ ${prevDescs}
           { id: 'skip', label: '🟡 弃票' },
         ]
       );
+      if (this._d()) return;
       if (target !== 'skip') {
         votes[this.userPlayer.id] = target;
       }
-      // Only show a neutral message — no vote target revealed
       this.addSystemMessage(`${this.userPlayer.name} 已投票`);
     }
 
     for (const player of alive) {
       if (player.isUser) continue;
       await this.sleep(400);
+      if (this._d()) return;
       const vote = await this.getAIVote(player, preVoteMessageCount);
+      if (this._d()) return;
       if (vote !== null) {
         votes[player.id] = vote;
       }
-      // Neutral message only
       this.addSystemMessage(`${player.name} 已投票`);
     }
 
-    // Reveal all votes together after everyone has voted
+    // Reveal all votes together
     this.addSystemMessage('📊 所有人已完成投票，结果如下：', 'important');
     for (const player of alive) {
       const targetId = votes[player.id];
@@ -596,8 +467,8 @@ ${prevDescs}
       const alive = this.alivePlayers.filter(p => p.id !== player.id);
       const prompt = this.buildVotePrompt(player, alive, preVoteMessageCount);
       const response = await aiService.chat(prompt, { temperature: 0.5, maxTokens: 50 }, player.profileId);
+      if (this._d()) return null;
 
-      // Check if AI chose to abstain
       if (response.includes('弃票') || response.includes('skip')) {
         return null;
       }
@@ -625,7 +496,6 @@ ${prevDescs}
   }
 
   buildVotePrompt(player, candidates, preVoteMessageCount) {
-    // Only include messages from before the voting phase to prevent information leakage
     const messagesBeforeVote = this.messages.slice(0, preVoteMessageCount);
     const recentMessages = messagesBeforeVote.slice(-20).map(m => {
       if (m.type === 'system') return `[系统]: ${m.text}`;
@@ -666,7 +536,7 @@ ${roleHint}
     if (Object.keys(tally).length === 0) {
       this.addSystemMessage('本轮没有人被投票淘汰');
       if (this.checkWinCondition()) return;
-      setTimeout(() => this.startRound(), 1500);
+      this._setTimeout(() => this.startRound(), 1500);
       return;
     }
 
@@ -695,14 +565,13 @@ ${roleHint}
         `投票结果：${eliminated.name} 被淘汰了！身份是：${roleLabel}`,
         eliminated.role === 'undercover' ? 'success' : 'danger'
       );
-      // Word is NOT revealed mid-game to anyone — only shown at game over
     }
 
     this.updatePlayerList();
 
     if (this.checkWinCondition()) return;
 
-    setTimeout(() => this.startRound(), 2000);
+    this._setTimeout(() => this.startRound(), 2000);
   }
 
   // ─── Win Condition ───
@@ -724,13 +593,10 @@ ${roleHint}
   }
 
   endGame(winner, message) {
-    this.state = 'gameover';
     this.gameResult = winner;
 
     this.addSystemMessage(`🎉 游戏结束！${message}`, winner === 'civilian' ? 'success' : 'danger');
     this.addSystemMessage(`平民词语：${this.civilianWord} | 卧底词语：${this.undercoverWord}`, 'important');
-    
-    this.updatePlayerList();
 
     const userRole = this.userPlayer.role;
     const userWon = (winner === 'civilian' && userRole !== 'undercover') ||
@@ -739,150 +605,25 @@ ${roleHint}
     const roleLabel = userRole === 'civilian' ? '平民' :
                       userRole === 'undercover' ? '卧底' : '白板';
 
-    const overlay = document.createElement('div');
-    overlay.className = 'game-over-overlay';
-    overlay.id = 'game-over';
-    overlay.innerHTML = `
-      <div class="game-over-card">
-        <div class="game-over-icon">${userWon ? '🎉' : '😢'}</div>
-        <h2>${userWon ? '恭喜你赢了！' : '游戏失败'}</h2>
-        <p>${message}</p>
-        <p style="color:var(--text-muted);font-size:13px;">
-          你的身份：${roleLabel} | 你的词语：${this.userPlayer.word}
-        </p>
-        <p style="color:var(--text-muted);font-size:12px;margin-top:8px;">
-          平民词：${this.civilianWord} | 卧底词：${this.undercoverWord}
-        </p>
-        <div class="game-over-actions" style="margin-top:20px">
-          <button class="btn btn-primary" id="btn-play-again">🔄 再来一局</button>
-          <button class="btn btn-ghost" id="btn-go-home">🏠 返回大厅</button>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('app').appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
-
-    document.getElementById('btn-play-again')?.addEventListener('click', () => {
-      overlay.remove();
-      this.renderSetup();
+    this.showGameOver({
+      icon: userWon ? '🎉' : '😢',
+      title: userWon ? '恭喜你赢了！' : '游戏失败',
+      message,
+      subtitle: `你的身份：${roleLabel} | 你的词语：${this.userPlayer.word}`,
+      extra: `平民词：${this.civilianWord} | 卧底词：${this.undercoverWord}`,
     });
-    document.getElementById('btn-go-home')?.addEventListener('click', () => {
-      overlay.remove();
-      this.app.navigate('home');
-    });
-  }
-
-  // ─── Shared Helpers ───
-  addSystemMessage(text, type = '') {
-    const msg = { type: 'system', text, subtype: type };
-    this.messages.push(msg);
-    const container = document.getElementById('game-messages');
-    if (container) {
-      container.appendChild(this.createMessageElement(msg));
-      container.scrollTop = container.scrollHeight;
-    }
-  }
-
-  /** Render a hint visible only in the UI; NOT added to this.messages so AI cannot read it. */
-  addPrivateHint(text) {
-    const container = document.getElementById('game-messages');
-    if (!container) return;
-    const el = document.createElement('div');
-    el.className = 'msg';
-    el.innerHTML = `<div class="msg-system" style="opacity:0.7;font-style:italic;">👁 ${text}</div>`;
-    container.appendChild(el);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  addPlayerMessage(player, text) {
-    const msg = { type: 'player', player, text };
-    this.messages.push(msg);
-    const container = document.getElementById('game-messages');
-    if (container) {
-      container.appendChild(this.createMessageElement(msg));
-      container.scrollTop = container.scrollHeight;
-    }
-  }
-
-  createMessageElement(msg) {
-    const el = document.createElement('div');
-    el.className = 'msg';
-    if (msg.type === 'system') {
-      el.innerHTML = `<div class="msg-system ${msg.subtype || ''}">${msg.text}</div>`;
-    } else {
-      const isUser = msg.player.isUser;
-      const modelBadge = !isUser && msg.player.modelName
-        ? `<span class="msg-model-badge">${msg.player.modelName}</span>`
-        : '';
-      el.innerHTML = `
-        <div class="msg-player ${isUser ? 'is-user' : ''}">
-          <div class="msg-avatar">${msg.player.avatar}</div>
-          <div class="msg-body">
-            <div class="msg-name">${msg.player.name}${isUser ? ' (你)' : ''}${modelBadge}</div>
-            <div class="msg-text">${msg.text}</div>
-          </div>
-        </div>
-      `;
-    }
-    return el;
-  }
-
-  showThinking(player) {
-    const container = document.getElementById('game-messages');
-    if (!container) return;
-    const modelInfo = player.modelName ? ` (${player.modelName})` : '';
-    const el = document.createElement('div');
-    el.className = 'msg';
-    el.id = 'thinking-indicator';
-    el.innerHTML = `
-      <div class="thinking-indicator">
-        <div class="thinking-dots"><span></span><span></span><span></span></div>
-        <span>${player.name}${modelInfo} 正在思考...</span>
-      </div>
-    `;
-    container.appendChild(el);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  hideThinking() {
-    document.getElementById('thinking-indicator')?.remove();
-  }
-
-  waitForUserChoice(title, options) {
-    return new Promise(resolve => {
-      const area = document.getElementById('action-area');
-      if (!area) return;
-
-      area.innerHTML = `
-        <div class="action-panel">
-          <h4>${title}</h4>
-          <div class="action-buttons" id="choice-buttons">
-            ${options.map(o => `
-              <button class="btn-vote ${o.id === 'skip' ? 'skip' : ''}" data-choice="${o.id}">${o.label}</button>
-            `).join('')}
-          </div>
-        </div>
-      `;
-
-      area.querySelectorAll('.btn-vote').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const choice = btn.dataset.choice;
-          area.querySelectorAll('.btn-vote').forEach(b => b.classList.remove('selected'));
-          btn.classList.add('selected');
-          setTimeout(() => {
-            area.innerHTML = '';
-            resolve(isNaN(choice) ? choice : parseInt(choice));
-          }, 300);
-        });
-      });
-
-      const container = document.getElementById('game-messages');
-      if (container) container.scrollTop = container.scrollHeight;
-    });
-  }
-
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
+
+// ─── Register this game ───
+registerGame({
+  id: 'undercover',
+  name: '谁是卧底',
+  icon: '🕵️',
+  tag: '词语推理',
+  description: '每个玩家拿到一个词语，大多数人拿到相同的词，卧底拿到相似但不同的词。通过描述词语来找出谁是卧底！',
+  playerRange: '5-8 人',
+  duration: '10-20 分钟',
+  features: '🗣 词语描述',
+  GameClass: UndercoverGame,
+});

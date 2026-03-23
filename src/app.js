@@ -1,9 +1,12 @@
 /**
- * App - Main application controller with routing and page management
+ * App - Main application controller with routing and page management.
+ *
+ * Games are loaded dynamically from the game registry.
+ * To add a new game, create a file in src/games/ and call registerGame().
+ * No changes to this file are needed.
  */
 import { aiService, AVAILABLE_MODELS } from './ai-service.js';
-import { WerewolfGame } from './games/werewolf.js';
-import { UndercoverGame } from './games/undercover.js';
+import { getAllGames } from './game-registry.js';
 
 export class App {
   constructor() {
@@ -20,6 +23,7 @@ export class App {
   navigate(page) {
     this.currentPage = page;
     if (this.currentGame) {
+      this.currentGame.destroy();
       this.currentGame = null;
     }
     this.render();
@@ -33,10 +37,12 @@ export class App {
 
     if (this.currentPage === 'home') {
       this.root.appendChild(this.createHomePage());
-    } else if (this.currentPage === 'werewolf') {
-      this.renderGame('werewolf');
-    } else if (this.currentPage === 'undercover') {
-      this.renderGame('undercover');
+    } else {
+      // Look up game from registry
+      const game = getAllGames().find(g => g.id === this.currentPage);
+      if (game) {
+        this.renderGame(game);
+      }
     }
 
     this.root.appendChild(this.createSettingsModal());
@@ -58,13 +64,19 @@ export class App {
     return frag;
   }
 
-  // ─── Navbar ───
+  // ─── Navbar (dynamic from registry) ───
   createNavbar() {
     const nav = document.createElement('nav');
     nav.className = 'navbar';
     nav.id = 'navbar';
     const connected = aiService.isConfigured;
     const profileCount = aiService.profiles.length;
+    const games = getAllGames();
+
+    const gameButtons = games.map(g =>
+      `<button class="nav-btn ${this.currentPage === g.id ? 'active' : ''}" id="nav-${g.id}-btn">${g.name}</button>`
+    ).join('');
+
     nav.innerHTML = `
       <div class="navbar-inner">
         <a class="navbar-brand" id="nav-home">
@@ -73,8 +85,7 @@ export class App {
         </a>
         <div class="navbar-nav">
           <button class="nav-btn ${this.currentPage === 'home' ? 'active' : ''}" id="nav-home-btn">首页</button>
-          <button class="nav-btn ${this.currentPage === 'werewolf' ? 'active' : ''}" id="nav-werewolf-btn">狼人杀</button>
-          <button class="nav-btn ${this.currentPage === 'undercover' ? 'active' : ''}" id="nav-undercover-btn">谁是卧底</button>
+          ${gameButtons}
           <button class="btn-settings" id="btn-settings">
             <span class="dot ${connected ? 'connected' : ''}"></span>
             模型配置 ${profileCount > 0 ? `(${profileCount})` : ''}
@@ -86,8 +97,9 @@ export class App {
     setTimeout(() => {
       document.getElementById('nav-home')?.addEventListener('click', () => this.navigate('home'));
       document.getElementById('nav-home-btn')?.addEventListener('click', () => this.navigate('home'));
-      document.getElementById('nav-werewolf-btn')?.addEventListener('click', () => this.navigate('werewolf'));
-      document.getElementById('nav-undercover-btn')?.addEventListener('click', () => this.navigate('undercover'));
+      games.forEach(g => {
+        document.getElementById(`nav-${g.id}-btn`)?.addEventListener('click', () => this.navigate(g.id));
+      });
       document.getElementById('btn-settings')?.addEventListener('click', () => this.showSettings());
     }, 0);
 
@@ -361,9 +373,29 @@ export class App {
     }, 3000);
   }
 
-  // ─── Home Page ───
+  // ─── Home Page (dynamic from registry) ───
   createHomePage() {
+    const games = getAllGames();
     const page = document.createElement('div');
+
+    const gameCards = games.map(g => `
+      <div class="game-card ${g.id}" id="card-${g.id}">
+        <div class="game-card-bg"></div>
+        <div class="game-card-content">
+          <span class="game-card-icon">${g.icon}</span>
+          <span class="game-card-tag">${g.tag}</span>
+          <h3>${g.name}</h3>
+          <p>${g.description}</p>
+          <div class="game-card-meta">
+            <span>👥 ${g.playerRange}</span>
+            <span>⏱ ${g.duration}</span>
+            <span>${g.features}</span>
+          </div>
+        </div>
+        <div class="game-card-arrow">→</div>
+      </div>
+    `).join('');
+
     page.innerHTML = `
       <section class="hero container">
         <div class="hero-badge">
@@ -382,65 +414,29 @@ export class App {
 
       <section class="container">
         <div class="games-grid" id="games-grid">
-          <div class="game-card werewolf" id="card-werewolf">
-            <div class="game-card-bg"></div>
-            <div class="game-card-content">
-              <span class="game-card-icon">🐺</span>
-              <span class="game-card-tag">社交推理</span>
-              <h3>狼人杀</h3>
-              <p>经典社交推理游戏。在白天讨论中找出隐藏的狼人，或者作为狼人每晚偷偷猎杀村民。包含预言家、女巫、猎人等特殊角色。</p>
-              <div class="game-card-meta">
-                <span>👥 6-8 人</span>
-                <span>⏱ 15-30 分钟</span>
-                <span>🎭 角色扮演</span>
-              </div>
-            </div>
-            <div class="game-card-arrow">→</div>
-          </div>
-
-          <div class="game-card undercover" id="card-undercover">
-            <div class="game-card-bg"></div>
-            <div class="game-card-content">
-              <span class="game-card-icon">🕵️</span>
-              <span class="game-card-tag">词语推理</span>
-              <h3>谁是卧底</h3>
-              <p>每个玩家拿到一个词语，大多数人拿到相同的词，卧底拿到相似但不同的词。通过描述词语来找出谁是卧底！</p>
-              <div class="game-card-meta">
-                <span>👥 5-8 人</span>
-                <span>⏱ 10-20 分钟</span>
-                <span>🗣 词语描述</span>
-              </div>
-            </div>
-            <div class="game-card-arrow">→</div>
-          </div>
+          ${gameCards}
         </div>
       </section>
     `;
 
     setTimeout(() => {
-      document.getElementById('card-werewolf')?.addEventListener('click', () => {
-        if (!aiService.isConfigured) {
-          this.showToast('请先在「模型配置」中添加至少一个 AI 模型', 'error');
-          this.showSettings();
-          return;
-        }
-        this.navigate('werewolf');
-      });
-      document.getElementById('card-undercover')?.addEventListener('click', () => {
-        if (!aiService.isConfigured) {
-          this.showToast('请先在「模型配置」中添加至少一个 AI 模型', 'error');
-          this.showSettings();
-          return;
-        }
-        this.navigate('undercover');
+      games.forEach(g => {
+        document.getElementById(`card-${g.id}`)?.addEventListener('click', () => {
+          if (!aiService.isConfigured) {
+            this.showToast('请先在「模型配置」中添加至少一个 AI 模型', 'error');
+            this.showSettings();
+            return;
+          }
+          this.navigate(g.id);
+        });
       });
     }, 0);
 
     return page;
   }
 
-  // ─── Game Page ───
-  renderGame(gameType) {
+  // ─── Game Page (dynamic from registry) ───
+  renderGame(gameConfig) {
     const container = document.createElement('div');
     container.className = 'game-page';
     container.innerHTML = `<div class="container" id="game-container"></div>`;
@@ -449,12 +445,7 @@ export class App {
     setTimeout(() => {
       const gc = document.getElementById('game-container');
       if (!gc) return;
-
-      if (gameType === 'werewolf') {
-        this.currentGame = new WerewolfGame(gc, this);
-      } else if (gameType === 'undercover') {
-        this.currentGame = new UndercoverGame(gc, this);
-      }
+      this.currentGame = new gameConfig.GameClass(gc, this);
     }, 0);
   }
 }
