@@ -1463,6 +1463,67 @@ select.form-input {
   min-width: 0;
 }
 
+/* AI Name Editing */
+.ai-name-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.ai-name-input {
+  width: 72px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+.ai-name-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(79, 124, 255, 0.1);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.ai-name-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.btn-random-name {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-glass);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-random-name:hover {
+  border-color: var(--accent-blue);
+  background: rgba(79, 124, 255, 0.08);
+  transform: rotate(15deg);
+}
+
+.btn-random-name:active {
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
 .model-color-indicator {
   width: 8px;
   height: 8px;

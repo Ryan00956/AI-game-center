@@ -9,7 +9,7 @@
  */
 import { aiService } from '../ai-service.js';
 import { registerGame } from '../game-registry.js';
-import { BaseGame, AVATARS, AI_NAMES } from './base-game.js';
+import { BaseGame, AVATARS } from './base-game.js';
 
 const ROLE_INFO = {
   werewolf: { name: '狼人', emoji: '🐺', color: 'werewolf', team: 'wolf' },
@@ -92,6 +92,8 @@ export class WerewolfGame extends BaseGame {
       const name = document.getElementById('input-player-name').value.trim();
       if (!name) { this.app.showToast('请输入你的名字', 'error'); return; }
       if (!aiService.profiles.length) { this.app.showToast('请先添加 AI 模型', 'error'); return; }
+      const nameCheck = this.validateNames(name);
+      if (!nameCheck.valid) { this.app.showToast(nameCheck.message, 'error'); return; }
       this.userName = name;
       this.playerCount = parseInt(document.getElementById('select-player-count').value);
       this.startGame();
@@ -119,7 +121,6 @@ export class WerewolfGame extends BaseGame {
       [roles[i], roles[j]] = [roles[j], roles[i]];
     }
 
-    const aiNames = AI_NAMES.slice(0, this.playerCount - 1);
     const userPos = Math.floor(Math.random() * this.playerCount);
 
     this.players = [];
@@ -135,7 +136,7 @@ export class WerewolfGame extends BaseGame {
         const profileId = this.playerProfiles[aiIdx] || aiService.getDefaultProfile()?.id || null;
         const profile = aiService.getProfile(profileId);
         this.players.push({
-          id: i, name: aiNames[aiIdx], isUser: false, role: roles[i],
+          id: i, name: this.getAIName(aiIdx), isUser: false, role: roles[i],
           alive: true, avatar: AVATARS[aiIdx % AVATARS.length],
           profileId, modelName: profile?.name || profile?.model || '未知',
           privateMemory: [],

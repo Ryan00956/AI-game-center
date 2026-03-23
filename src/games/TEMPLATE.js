@@ -49,7 +49,7 @@
 
 import { aiService } from '../ai-service.js';
 import { registerGame } from '../game-registry.js';
-import { BaseGame, AVATARS, AI_NAMES } from './base-game.js';
+import { BaseGame, AVATARS } from './base-game.js';
 
 // ─── Step 1: 定义你的游戏类 ───
 
@@ -118,6 +118,8 @@ class MyNewGame extends BaseGame {
       const name = document.getElementById('input-player-name').value.trim();
       if (!name) { this.app.showToast('请输入你的名字', 'error'); return; }
       if (!aiService.profiles.length) { this.app.showToast('请先添加 AI 模型', 'error'); return; }
+      const nameCheck = this.validateNames(name);
+      if (!nameCheck.valid) { this.app.showToast(nameCheck.message, 'error'); return; }
       this.userName = name;
       this.startGame();
     });

@@ -22,7 +22,21 @@ import { aiService } from '../ai-service.js';
 
 // ─── Shared Constants ───
 export const AVATARS = ['🧑', '👩', '👨', '🧓', '👴', '👱', '🧔', '👲'];
-export const AI_NAMES = ['小明', '小红', '小刚', '小丽', '小华', '小芳', '小强'];
+
+// Random name pool for AI players
+export const AI_NAME_POOL = [
+  '小明', '小红', '小刚', '小丽', '小华', '小芳', '小强', '小杰',
+  '阿宝', '阿飞', '阿凯', '阿月', '阿星', '阿云', '阿雪', '阿辉',
+  '大壮', '大毛', '大勇', '大宝',
+  '悟空', '悟净', '悟能', '哪吒', '敖丙',
+  '路飞', '鸣人', '柯南', '小兰',
+  '豆豆', '团团', '圆圆', '花花', '果果', '糖糖',
+  '天天', '乐乐', '欢欢', '安安', '晴晴', '萌萌',
+];
+
+// Legacy export for backward compatibility
+export const AI_NAMES = AI_NAME_POOL.slice(0, 7);
+
 export const PROFILE_COLORS = [
   '#4f7cff', '#8b5cf6', '#ec4899', '#06b6d4',
   '#10b981', '#f59e0b', '#ef4444', '#f97316',
@@ -41,6 +55,7 @@ export class BaseGame {
     this.messages = [];         // Public message log (AI can read these)
     this.gameResult = null;
     this.playerProfiles = {};   // { slotIndex: profileId }
+    this.aiPlayerNames = {};    // { slotIndex: customName }
     this._pendingTimers = [];   // Track setTimeout IDs for cleanup
   }
 
@@ -84,33 +99,108 @@ export class BaseGame {
   // ════════════════════════════════════════════
 
   /**
-   * Initialize default profile assignments for AI player slots.
+   * Initialize default profile assignments and names for AI player slots.
    * Call this in renderSetup() and when player count changes.
    */
   initDefaultProfiles(aiCount) {
     const defaultProfile = aiService.getDefaultProfile();
+    const usedNames = new Set(Object.values(this.aiPlayerNames));
     for (let i = 0; i < aiCount; i++) {
       const currentId = this.playerProfiles[i];
       // Fix stale profile IDs: if the saved ID no longer exists, reset to default
       if (!currentId || !aiService.getProfile(currentId)) {
         this.playerProfiles[i] = defaultProfile?.id || '';
       }
+      // Assign default names if not set
+      if (!this.aiPlayerNames[i]) {
+        this.aiPlayerNames[i] = this._pickRandomName(usedNames);
+        usedNames.add(this.aiPlayerNames[i]);
+      }
+    }
+  }
+
+  /** Pick a random name from the pool that hasn't been used yet. */
+  _pickRandomName(usedNames) {
+    const available = AI_NAME_POOL.filter(n => !usedNames.has(n));
+    if (available.length > 0) {
+      return available[Math.floor(Math.random() * available.length)];
+    }
+    // Fallback: generate a unique name
+    let idx = 1;
+    while (usedNames.has(`玩家${idx}`)) idx++;
+    return `玩家${idx}`;
+  }
+
+  /** Get all current AI names as a Set. */
+  _getAllAINames() {
+    return new Set(Object.values(this.aiPlayerNames));
+  }
+
+  /**
+   * Get the AI player name for a given slot index.
+   * @param {number} index
+   * @returns {string}
+   */
+  getAIName(index) {
+    return this.aiPlayerNames[index] || AI_NAME_POOL[index] || `AI_${index + 1}`;
+  }
+
+  /** Randomize all AI player names at once. */
+  randomizeAllNames() {
+    const usedNames = new Set();
+    const count = Object.keys(this.aiPlayerNames).length;
+    for (let i = 0; i < count; i++) {
+      this.aiPlayerNames[i] = this._pickRandomName(usedNames);
+      usedNames.add(this.aiPlayerNames[i]);
     }
   }
 
   /**
-   * Render AI player assignment slots HTML.
+   * Validate that user name doesn't collide with any AI name.
+   * @param {string} userName
+   * @returns {{ valid: boolean, message?: string }}
+   */
+  validateNames(userName) {
+    const aiNames = Object.values(this.aiPlayerNames);
+
+    // Check user name vs AI names
+    if (aiNames.some(n => n === userName)) {
+      return { valid: false, message: '你的名字和某个 AI 玩家重名了，请修改' };
+    }
+
+    // Check AI name duplicates
+    const seen = new Set();
+    for (const name of aiNames) {
+      if (!name.trim()) {
+        return { valid: false, message: 'AI 玩家名字不能为空' };
+      }
+      if (seen.has(name)) {
+        return { valid: false, message: `AI 玩家名字「${name}」重复了，请修改` };
+      }
+      seen.add(name);
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Render AI player assignment slots HTML with editable names.
    * @returns {string} HTML string
    */
   renderAISlots(count, profiles) {
-    return AI_NAMES.slice(0, count).map((name, i) => {
+    return Array.from({ length: count }, (_, i) => {
+      const name = this.aiPlayerNames[i] || AI_NAME_POOL[i] || `AI_${i + 1}`;
       const selectedId = this.playerProfiles[i] || '';
       const profileIdx = profiles.findIndex(p => p.id === selectedId);
       const color = profileIdx >= 0 ? PROFILE_COLORS[profileIdx % PROFILE_COLORS.length] : '#666';
       return `
         <div class="ai-player-row">
           <div class="player-avatar">${AVATARS[i % AVATARS.length]}</div>
-          <span class="player-name">${name}</span>
+          <div class="ai-name-group">
+            <input type="text" class="ai-name-input" id="ai-name-${i}" 
+              value="${name}" maxlength="8" placeholder="AI名字" />
+            <button class="btn-random-name" id="btn-random-${i}" title="随机名字">🎲</button>
+          </div>
           <div class="model-color-indicator" style="background:${color}" id="dot-${i}"></div>
           <select class="form-input" id="profile-select-${i}">
             ${!profiles.length ? '<option value="">无可用模型</option>' : ''}
@@ -122,9 +212,10 @@ export class BaseGame {
     }).join('');
   }
 
-  /** Bind change events for AI profile selectors. */
+  /** Bind change events for AI profile selectors and name inputs. */
   bindProfileSelectors(count) {
     for (let i = 0; i < count; i++) {
+      // Profile selector
       const sel = document.getElementById(`profile-select-${i}`);
       if (sel) {
         sel.addEventListener('change', (e) => {
@@ -134,6 +225,27 @@ export class BaseGame {
           if (dot) {
             dot.style.background = idx >= 0 ? PROFILE_COLORS[idx % PROFILE_COLORS.length] : '#666';
           }
+        });
+      }
+
+      // Name input
+      const nameInput = document.getElementById(`ai-name-${i}`);
+      if (nameInput) {
+        nameInput.addEventListener('input', (e) => {
+          this.aiPlayerNames[i] = e.target.value.trim();
+        });
+      }
+
+      // Random name button
+      const randomBtn = document.getElementById(`btn-random-${i}`);
+      if (randomBtn) {
+        randomBtn.addEventListener('click', () => {
+          const usedNames = this._getAllAINames();
+          usedNames.delete(this.aiPlayerNames[i]); // Allow reuse of current name's slot
+          const newName = this._pickRandomName(usedNames);
+          this.aiPlayerNames[i] = newName;
+          const input = document.getElementById(`ai-name-${i}`);
+          if (input) input.value = newName;
         });
       }
     }

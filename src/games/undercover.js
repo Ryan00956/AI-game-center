@@ -11,7 +11,7 @@
  */
 import { aiService } from '../ai-service.js';
 import { registerGame } from '../game-registry.js';
-import { BaseGame, AVATARS, AI_NAMES } from './base-game.js';
+import { BaseGame, AVATARS } from './base-game.js';
 
 // Word pairs: [civilian word, undercover word]
 const WORD_PAIRS = [
@@ -138,6 +138,11 @@ export class UndercoverGame extends BaseGame {
         this.app.showToast('请先在「模型配置」中添加至少一个 AI 模型', 'error');
         return;
       }
+      const nameCheck = this.validateNames(name);
+      if (!nameCheck.valid) {
+        this.app.showToast(nameCheck.message, 'error');
+        return;
+      }
       this.userName = name;
       this.playerCount = parseInt(document.getElementById('select-player-count').value);
       this.startGame();
@@ -174,7 +179,6 @@ export class UndercoverGame extends BaseGame {
       [roles[i], roles[j]] = [roles[j], roles[i]];
     }
 
-    const aiNames = AI_NAMES.slice(0, this.playerCount - 1);
     const userPos = Math.floor(Math.random() * this.playerCount);
 
     this.players = [];
@@ -200,7 +204,7 @@ export class UndercoverGame extends BaseGame {
         const profile = aiService.getProfile(profileId);
         this.players.push({
           id: i,
-          name: aiNames[aiIdx],
+          name: this.getAIName(aiIdx),
           isUser: false,
           role,
           word,
