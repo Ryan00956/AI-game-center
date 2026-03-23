@@ -29,6 +29,7 @@
   --gradient-primary: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 50%, #ec4899 100%);
   --gradient-card-werewolf: linear-gradient(135deg, #1a1a3e 0%, #2d1b4e 100%);
   --gradient-card-undercover: linear-gradient(135deg, #1a2a3e 0%, #1b3b4e 100%);
+  --gradient-card-avalon: linear-gradient(135deg, #1a243e 0%, #2b1b43 100%);
   --gradient-glow: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(79, 124, 255, 0.06), transparent 40%);
   
   /* Borders */
@@ -405,6 +406,10 @@ body {
   background: var(--gradient-card-undercover);
 }
 
+.game-card.avalon .game-card-bg {
+  background: var(--gradient-card-avalon);
+}
+
 .game-card-content {
   position: relative;
   z-index: 1;
@@ -440,6 +445,12 @@ body {
   background: rgba(6, 182, 212, 0.15);
   color: var(--accent-cyan);
   border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.game-card.avalon .game-card-tag {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-orange);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .game-card h3 {
@@ -811,6 +822,11 @@ select.form-input {
   background: var(--bg-glass-hover);
 }
 
+.player-item.is-leader {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
 .player-item.eliminated {
   opacity: 0.4;
   text-decoration: line-through;
@@ -876,6 +892,119 @@ select.form-input {
 .player-role-badge.hunter {
   background: rgba(245, 158, 11, 0.15);
   color: var(--accent-orange);
+}
+
+.avalon-board {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.avalon-score {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.avalon-score-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.avalon-score-badge.good {
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.avalon-score-badge.evil {
+  color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.avalon-board-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.avalon-quests {
+  display: grid;
+  gap: 8px;
+  margin-top: var(--space-sm);
+}
+
+.avalon-quest {
+  display: grid;
+  grid-template-columns: 24px 40px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.avalon-quest.pending {
+  color: var(--text-muted);
+}
+
+.avalon-quest.current {
+  border-color: rgba(79, 124, 255, 0.3);
+  background: rgba(79, 124, 255, 0.08);
+}
+
+.avalon-quest.success {
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.avalon-quest.fail {
+  border-color: rgba(239, 68, 68, 0.24);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.avalon-quest-index {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.avalon-quest-size {
+  color: var(--text-secondary);
+}
+
+.avalon-quest-label {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avalon-team-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+
+.avalon-team-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(79, 124, 255, 0.12);
+  color: var(--accent-blue);
+  font-size: 12px;
+}
+
+.avalon-team-empty {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 /* Chat / Game log area */
@@ -1128,6 +1257,11 @@ select.form-input {
   color: white;
 }
 
+.btn-vote:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn-vote.skip {
   border-color: rgba(245, 158, 11, 0.3);
   color: var(--accent-orange);
@@ -1135,6 +1269,12 @@ select.form-input {
 
 .btn-vote.skip:hover {
   background: rgba(245, 158, 11, 0.1);
+}
+
+.avalon-selection-summary {
+  margin: 12px 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 /* === Undercover-specific styles === */
