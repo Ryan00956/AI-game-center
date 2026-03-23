@@ -127,6 +127,67 @@ class AIService {
     return 'p_' + Math.random().toString(36).substring(2, 9);
   }
 
+  // ─── Connection Test ───
+
+  /**
+   * Test if a profile can successfully connect and get a response
+   * @param {string} profileId
+   * @returns {Promise<{success: boolean, message: string, latency: number}>}
+   */
+  async testConnection(profileId) {
+    const profile = profileId ? this.getProfile(profileId) : this.getDefaultProfile();
+    if (!profile) {
+      return { success: false, message: '档案不存在', latency: 0 };
+    }
+
+    const startTime = Date.now();
+
+    let targetUrl = profile.apiUrl || DEFAULT_API_URL;
+    if (targetUrl.endsWith('/v1') || targetUrl.endsWith('/v1/')) {
+      targetUrl = targetUrl.replace(/\/+$/, '') + '/chat/completions';
+    }
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${profile.apiKey}`,
+          'X-Target-URL': targetUrl,
+        },
+        body: JSON.stringify({
+          model: profile.model,
+          messages: [{ role: 'user', content: 'Hi! Please reply with "OK" only.' }],
+          temperature: 0,
+          max_tokens: 10,
+          stream: false,
+        }),
+      });
+
+      const latency = Date.now() - startTime;
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const errMsg = err.error?.message || `HTTP ${response.status}`;
+        return { success: false, message: errMsg, latency };
+      }
+
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content?.trim();
+      if (reply) {
+        return { success: true, message: `模型响应正常 (${latency}ms)`, latency };
+      } else {
+        return { success: false, message: '模型返回了空响应', latency };
+      }
+    } catch (error) {
+      const latency = Date.now() - startTime;
+      if (error.message.includes('Failed to fetch')) {
+        return { success: false, message: '网络连接失败，请检查 API 地址', latency };
+      }
+      return { success: false, message: error.message, latency };
+    }
+  }
+
   // ─── Chat API ───
 
   /**

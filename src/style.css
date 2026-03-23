@@ -1378,6 +1378,45 @@ select.form-input {
   background: rgba(239, 68, 68, 0.1);
 }
 
+/* Test Connection Button */
+.btn-icon.btn-test-profile:hover {
+  background: rgba(79, 124, 255, 0.1);
+}
+
+.btn-icon.btn-test-profile.testing {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.btn-icon.btn-test-profile.test-success {
+  background: rgba(16, 185, 129, 0.15);
+  animation: testPulse 0.4s ease-out;
+}
+
+.btn-icon.btn-test-profile.test-error {
+  background: rgba(239, 68, 68, 0.15);
+  animation: testPulse 0.4s ease-out;
+}
+
+@keyframes testPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.test-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(79, 124, 255, 0.2);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Profile Editor */
 .profile-editor {
   padding: 16px;

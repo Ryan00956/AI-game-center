@@ -175,6 +175,10 @@ export class App {
           </div>
         </div>
         <div class="profile-card-actions">
+          <button class="btn-icon btn-test-profile" data-id="${p.id}" title="测试连接">
+            <span class="test-icon">🔗</span>
+            <span class="test-spinner" style="display:none"></span>
+          </button>
           <button class="btn-icon btn-edit-profile" data-id="${p.id}" title="编辑">✏️</button>
           <button class="btn-icon btn-delete-profile" data-id="${p.id}" title="删除">🗑️</button>
         </div>
@@ -182,6 +186,45 @@ export class App {
     `).join('');
 
     // Bind events
+    container.querySelectorAll('.btn-test-profile').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const profileId = btn.dataset.id;
+        const icon = btn.querySelector('.test-icon');
+        const spinner = btn.querySelector('.test-spinner');
+
+        // Show loading state
+        btn.disabled = true;
+        btn.classList.remove('test-success', 'test-error');
+        btn.classList.add('testing');
+        icon.style.display = 'none';
+        spinner.style.display = 'block';
+
+        const result = await aiService.testConnection(profileId);
+
+        // Show result
+        spinner.style.display = 'none';
+        icon.style.display = 'inline';
+        btn.classList.remove('testing');
+
+        if (result.success) {
+          btn.classList.add('test-success');
+          icon.textContent = '✅';
+          this.showToast(`✓ ${result.message}`, 'success');
+        } else {
+          btn.classList.add('test-error');
+          icon.textContent = '❌';
+          this.showToast(`✗ 连接失败: ${result.message}`, 'error');
+        }
+
+        btn.disabled = false;
+
+        // Reset icon after 3 seconds
+        setTimeout(() => {
+          btn.classList.remove('test-success', 'test-error');
+          icon.textContent = '🔗';
+        }, 3000);
+      });
+    });
     container.querySelectorAll('.btn-edit-profile').forEach(btn => {
       btn.addEventListener('click', () => {
         const profile = aiService.getProfile(btn.dataset.id);
