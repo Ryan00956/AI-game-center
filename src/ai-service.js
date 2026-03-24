@@ -1,15 +1,15 @@
 /**
  * AI Service - Supports multiple API profiles for different AI players
  * 
- * Uses 小弛SaaS API (OpenAI-compatible)
- * Base URL: https://llm.xiaochisaas.com/v1
+ * Default: OpenAI API (also compatible with any OpenAI-format endpoint)
+ * Base URL: https://api.openai.com/v1
  */
 
-const DEFAULT_BASE_URL = 'https://llm.xiaochisaas.com/v1';
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_API_URL = DEFAULT_BASE_URL + '/chat/completions';
 const STORAGE_KEY = 'ai_game_profiles';
 
-// Available models from 小弛SaaS
+// Available models
 export const AVAILABLE_MODELS = [
   { group: 'Gemini (Google)', models: [
     { id: 'gemini-3-flash', name: 'Gemini 3 Flash', desc: '快速、性价比高' },

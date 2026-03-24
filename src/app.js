@@ -281,9 +281,9 @@ export class App {
       <div class="form-group">
         <label class="form-label">API 地址</label>
         <input type="text" class="form-input" id="pe-url" 
-          placeholder="https://llm.xiaochisaas.com/v1/chat/completions" 
-          value="${isEdit ? existingProfile.apiUrl : 'https://llm.xiaochisaas.com/v1/chat/completions'}" />
-        <p class="form-hint">默认使用小弛SaaS，也支持其他 OpenAI 兼容接口</p>
+          placeholder="https://api.openai.com/v1/chat/completions" 
+          value="${isEdit ? existingProfile.apiUrl : 'https://api.openai.com/v1/chat/completions'}" />
+        <p class="form-hint">默认使用 OpenAI 官方接口，也支持其他兼容接口</p>
       </div>
       <div class="form-group">
         <label class="form-label">选择模型 *</label>
