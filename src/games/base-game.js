@@ -21,7 +21,7 @@
 import { aiService } from '../ai-service.js';
 
 // ─── Shared Constants ───
-export const AVATARS = ['🧑', '👩', '👨', '🧓', '👴', '👱', '🧔', '👲'];
+export const AVATARS = ['🧑', '👩', '👨', '🧓', '👴', '👱', '🧔', '👲', '🧕', '👳'];
 
 // Random name pool for AI players
 export const AI_NAME_POOL = [
@@ -57,6 +57,7 @@ export class BaseGame {
     this.playerProfiles = {};   // { slotIndex: profileId }
     this.aiPlayerNames = {};    // { slotIndex: customName }
     this._pendingTimers = [];   // Track setTimeout IDs for cleanup
+    this.enableLogging = false; // When true, output full AI prompts/responses to game log
   }
 
   // ════════════════════════════════════════════
@@ -252,6 +253,43 @@ export class BaseGame {
   }
 
   // ════════════════════════════════════════════
+  //  LOGGING TOGGLE (Setup Screen)
+  // ════════════════════════════════════════════
+
+  /**
+   * Render the logging toggle HTML for the setup screen.
+   * Call this in renderSetup() inside the game-setup div.
+   * @returns {string} HTML string
+   */
+  renderLogToggle() {
+    return `
+      <div class="setup-section">
+        <div class="setup-section-title">📋 调试选项</div>
+        <label class="log-toggle-label" for="toggle-logging">
+          <div class="log-toggle-switch">
+            <input type="checkbox" id="toggle-logging" ${this.enableLogging ? 'checked' : ''} />
+            <span class="log-toggle-slider"></span>
+          </div>
+          <div class="log-toggle-text">
+            <span class="log-toggle-title">保存完整日志</span>
+            <span class="log-toggle-desc">开启后将在游戏记录中显示 AI 的完整 Prompt、原始回复等调试信息</span>
+          </div>
+        </label>
+      </div>
+    `;
+  }
+
+  /** Bind the logging toggle event. Call after renderSetup DOM is ready. */
+  bindLogToggle() {
+    const toggle = document.getElementById('toggle-logging');
+    if (toggle) {
+      toggle.addEventListener('change', (e) => {
+        this.enableLogging = e.target.checked;
+      });
+    }
+  }
+
+  // ════════════════════════════════════════════
   //  GAME LAYOUT (Playing Screen)
   // ════════════════════════════════════════════
 
@@ -356,7 +394,7 @@ export class BaseGame {
   /** Show a message in UI only — NOT added to this.messages, so AI can't see it. */
   addPrivateMessage(text, type = '') {
     if (this.state === 'destroyed') return;
-    const msg = { type: 'system', text, subtype: type };
+    const msg = { type: 'system', text, subtype: type, private: true };
     this._appendToLog(msg);
   }
 
@@ -381,6 +419,21 @@ export class BaseGame {
   createMessageElement(msg) {
     const el = document.createElement('div');
     el.className = 'msg';
+    if (msg.type === 'system') {
+      el._logData = {
+        kind: msg.private ? 'private-system' : 'system',
+        text: msg.text,
+        subtype: msg.subtype || '',
+      };
+    } else {
+      el._logData = {
+        kind: 'player',
+        name: msg.player.name,
+        isUser: !!msg.player.isUser,
+        modelName: msg.player.modelName || '',
+        text: msg.text,
+      };
+    }
     if (msg.type === 'system') {
       el.innerHTML = `<div class="msg-system ${msg.subtype || ''}">${msg.text}</div>`;
     } else {
@@ -442,10 +495,25 @@ export class BaseGame {
     const { temperature = 0.85, maxTokens = 200, silent = false } = opts;
     if (this.state === 'destroyed') return null;
     if (!silent) this.showThinking(player);
+
+    // Log the prompt when logging is enabled
+    if (this.enableLogging) {
+      const promptText = messages.map(m => `[${m.role}]\n${m.content}`).join('\n\n');
+      this.addDebugLog(`📤 AI请求 → ${player.name} (${player.modelName || '未知'})`, promptText, {
+        temperature, maxTokens,
+      });
+    }
+
     try {
       const resp = await aiService.chat(messages, { temperature, maxTokens }, player.profileId);
       if (this.state === 'destroyed') return null;
       if (!silent) this.hideThinking();
+
+      // Log the response when logging is enabled
+      if (this.enableLogging) {
+        this.addDebugLog(`📥 AI回复 ← ${player.name} (${player.modelName || '未知'})`, resp || '(空回复)');
+      }
+
       return resp;
     } catch (err) {
       if (this.state === 'destroyed') return null;
@@ -454,6 +522,10 @@ export class BaseGame {
         this.addSystemMessage(
           `⚠️ ${player.name} (${player.modelName}) API失败: ${err.message}`, 'danger'
         );
+      }
+      // Log the error when logging is enabled
+      if (this.enableLogging) {
+        this.addDebugLog(`❌ AI错误 — ${player.name}`, err.message);
       }
       console.error(`AI ${player.name} error:`, err);
       return null;
@@ -527,6 +599,79 @@ export class BaseGame {
   }
 
   // ════════════════════════════════════════════
+  //  DEBUG LOGGING
+  // ════════════════════════════════════════════
+
+  /**
+   * Add a debug log message to the game log (only shown when enableLogging is true).
+   * Renders as a collapsible block so it doesn't clutter the view.
+   *
+   * @param {string} title   - Short summary line
+   * @param {string} detail  - Full content (can be multi-line)
+   * @param {Object} [meta]  - Optional key-value pairs to display
+   */
+  addDebugLog(title, detail, meta = null) {
+    if (!this.enableLogging) return;
+    if (this.state === 'destroyed') return;
+
+    const container = document.getElementById('game-messages');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = 'msg msg-debug';
+    const rawTitle = String(title ?? '');
+    const rawDetail = String(detail ?? '');
+    el._logData = {
+      kind: 'debug',
+      title: rawTitle,
+      detail: rawDetail,
+      meta: meta ? { ...meta } : null,
+    };
+
+    const metaHtml = meta
+      ? `<div class="debug-meta">${Object.entries(meta).map(([k, v]) => `<span>${this.escapeHtml(k)}: ${this.escapeHtml(v)}</span>`).join('<span class="debug-meta-separator"> | </span>')}</div>`
+      : '';
+
+    // Escape HTML in detail
+    const escaped = this.escapeHtml(rawDetail).replace(/\n/g, '<br>');
+
+    el.innerHTML = `
+      <div class="debug-log">
+        <div class="debug-log-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <span class="debug-log-icon">🔍</span>
+          <span class="debug-log-title">${this.escapeHtml(rawTitle)}</span>
+          <span class="debug-log-toggle">▶</span>
+        </div>
+        ${metaHtml}
+        <div class="debug-log-content">
+          <pre>${escaped}</pre>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  /**
+   * Convenience method for game subclasses to log arbitrary game events.
+   * @param {string} event - Event description
+   */
+  logEvent(event) {
+    if (!this.enableLogging) return;
+    this.addDebugLog('📝 游戏事件', event);
+  }
+
+  escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ════════════════════════════════════════════
   //  GAME OVER
   // ════════════════════════════════════════════
 
@@ -546,6 +691,11 @@ export class BaseGame {
     // Re-render player list now that state is 'gameover' so all roles are visible
     this.updatePlayerList();
 
+    // If logging was enabled, add a download log button
+    const logBtnHtml = this.enableLogging
+      ? `<button class="btn btn-ghost" id="btn-download-log" style="margin-top:8px">📋 下载完整日志</button>`
+      : '';
+
     const overlay = document.createElement('div');
     overlay.className = 'game-over-overlay';
     overlay.id = 'game-over';
@@ -559,6 +709,7 @@ export class BaseGame {
         <div class="game-over-actions" style="margin-top:20px">
           <button class="btn btn-primary" id="btn-play-again">🔄 再来一局</button>
           <button class="btn btn-ghost" id="btn-go-home">🏠 返回大厅</button>
+          ${logBtnHtml}
         </div>
       </div>`;
 
@@ -574,6 +725,62 @@ export class BaseGame {
       overlay.remove();
       this.app.navigate('home');
     });
+    document.getElementById('btn-download-log')?.addEventListener('click', () => {
+      this.downloadLog();
+    });
+  }
+
+  /** Download the full game log as a text file. */
+  downloadLog() {
+    const logEl = document.getElementById('game-messages');
+    if (!logEl) return;
+
+    // Collect all text content from the game log, including debug entries
+    const lines = [];
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    lines.push(`=== AI Game Center 完整日志 ===`);
+    lines.push(`导出时间: ${new Date().toLocaleString('zh-CN')}`);
+    lines.push(`========================\n`);
+
+    // Iterate through all messages in the log
+    for (const child of logEl.children) {
+      const record = child._logData;
+      if (!record) continue;
+
+      if (record.kind === 'debug') {
+        lines.push(`[DEBUG] ${record.title}`);
+        if (record.meta) {
+          lines.push(`  ${Object.entries(record.meta).map(([k, v]) => `${k}: ${v}`).join(' | ')}`);
+        }
+        lines.push(record.detail);
+        lines.push('');
+        continue;
+      }
+
+      if (record.kind === 'private-system') {
+        lines.push(`[仅你可见] ${record.text}`);
+        continue;
+      }
+
+      if (record.kind === 'system') {
+        lines.push(`[系统] ${record.text}`);
+        continue;
+      }
+
+      if (record.kind === 'player') {
+        const suffix = record.isUser ? ' (你)' : '';
+        lines.push(`[${record.name}${suffix}] ${record.text}`);
+      }
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `game-log-${timestamp}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ════════════════════════════════════════════

@@ -1698,6 +1698,196 @@ select.form-input {
   text-overflow: ellipsis;
 }
 
+/* === Log Toggle Switch (Setup Screen) === */
+.log-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.log-toggle-label:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.log-toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.log-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.log-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  border: 1px solid var(--border-subtle);
+  transition: var(--transition-fast);
+}
+
+.log-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: var(--transition-fast);
+}
+
+.log-toggle-switch input:checked + .log-toggle-slider {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.log-toggle-switch input:checked + .log-toggle-slider::before {
+  transform: translateX(20px);
+  background: var(--accent-purple);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+.log-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-toggle-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.log-toggle-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* === Debug Log Messages (Game Log) === */
+.msg-debug {
+  margin-bottom: var(--space-sm);
+}
+
+.debug-log {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.04);
+  overflow: hidden;
+  transition: var(--transition-fast);
+}
+
+.debug-log-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+
+.debug-log-header:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.debug-log-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.debug-log-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-purple);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-log-toggle {
+  font-size: 9px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.debug-log.expanded .debug-log-toggle {
+  transform: rotate(90deg);
+}
+
+.debug-meta {
+  display: flex;
+  gap: var(--space-md);
+  padding: 2px var(--space-sm) 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.debug-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(139, 92, 246, 0.08);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.debug-log-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.debug-log.expanded .debug-log-content {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.debug-log-content pre {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-family: 'SFMono-Regular', 'Consolas', 'Menlo', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-top: 1px solid rgba(139, 92, 246, 0.1);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Custom scrollbar for debug log content */
+.debug-log-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.debug-log-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.debug-log-content::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 2px;
+}
+
 /* === Responsive === */
 @media (max-width: 768px) {
   .games-grid {

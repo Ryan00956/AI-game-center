@@ -118,6 +118,7 @@ export class AvalonGame extends BaseGame {
           </div>
           ${profiles.length === 0 ? '<p class="form-hint" style="margin-top:8px;color:var(--accent-orange);">⚠️ 请先在右上角「模型配置」中添加模型</p>' : ''}
         </div>
+        ${this.renderLogToggle()}
         <button class="btn btn-primary btn-block" id="btn-start-game" style="margin-top:8px">🏰 开始游戏</button>
       </div>
     `;
@@ -132,6 +133,7 @@ export class AvalonGame extends BaseGame {
     });
 
     this.bindProfileSelectors(aiCount);
+    this.bindLogToggle();
 
     document.getElementById('btn-start-game')?.addEventListener('click', () => {
       const name = document.getElementById('input-player-name').value.trim();

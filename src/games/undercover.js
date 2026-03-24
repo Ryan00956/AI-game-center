@@ -109,6 +109,8 @@ export class UndercoverGame extends BaseGame {
           ${profiles.length === 0 ? '<p class="form-hint" style="margin-top:8px;color:var(--accent-orange);">⚠️ 还没有配置模型档案，请先在右上角「模型配置」中添加</p>' : ''}
         </div>
 
+        ${this.renderLogToggle()}
+
         <button class="btn btn-primary btn-block" id="btn-start-game" style="margin-top:8px">
           🎲 开始游戏
         </button>
@@ -127,6 +129,7 @@ export class UndercoverGame extends BaseGame {
     });
 
     this.bindProfileSelectors(aiCount);
+    this.bindLogToggle();
 
     document.getElementById('btn-start-game')?.addEventListener('click', () => {
       const name = document.getElementById('input-player-name').value.trim();
@@ -470,8 +473,20 @@ ${prevDescs}
     try {
       const alive = this.alivePlayers.filter(p => p.id !== player.id);
       const prompt = this.buildVotePrompt(player, alive, preVoteMessageCount);
+
+      // Log the vote prompt
+      if (this.enableLogging) {
+        const promptText = prompt.map(m => `[${m.role}]\n${m.content}`).join('\n\n');
+        this.addDebugLog(`📤 投票请求 → ${player.name}`, promptText, { temperature: 0.5, maxTokens: 50 });
+      }
+
       const response = await aiService.chat(prompt, { temperature: 0.5, maxTokens: 50 }, player.profileId);
       if (this._d()) return null;
+
+      // Log the vote response
+      if (this.enableLogging) {
+        this.addDebugLog(`📥 投票回复 ← ${player.name}`, response || '(空回复)');
+      }
 
       if (response.includes('弃票') || response.includes('skip')) {
         return null;
@@ -485,6 +500,9 @@ ${prevDescs}
       return this.getAIFallbackVote(player, alive);
     } catch (err) {
       this.addSystemMessage(`⚠️ ${player.name} 投票API失败: ${err.message}`, 'danger');
+      if (this.enableLogging) {
+        this.addDebugLog(`❌ 投票错误 — ${player.name}`, err.message);
+      }
       return this.getAIFallbackVote(player, this.alivePlayers.filter(p => p.id !== player.id));
     }
   }
